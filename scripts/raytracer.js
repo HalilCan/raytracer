@@ -1,5 +1,7 @@
 ///////////////////////////// Flags //////////////////////////////
 let rayCastDebug = 1;
+//unfortunately everything is placed in this one mega-file, 
+//for some reason local development with js modules is prohibitive
 //////////////////////////////////////////////////////////////////
 
 //////////////////////////// Structs /////////////////////////////
@@ -19,6 +21,22 @@ class Vector {
   }
   scale(scalar) {
     return new Vector(this.x * scalar, this.y * scalar, this.z * scalar);
+  }
+  norm(){
+    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+  }
+  unitVec(v){
+    let norm = this.norm();
+    return new Vector(thix.x / norm, thix.y / norm, thix.z / norm);
+  }
+  dot(v){
+    return (this.x * v.x + this.y + v.y + this.z + v.z);
+    //equivalent to |this||v|cosTheta
+  }
+  projectionOnto(v) {
+    return (this.dot(v) / v.norm());
+    //this.dot(v) is |this||v|cosTheta
+    //this projected onto v has magnitude |this|cosTheta and direction v * sign(cosTheta)
   }
 }
 
@@ -121,7 +139,7 @@ function castAllRays() {
                 let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
                 red = xScale * 255;
                 green = yScale * 255;
-                blue = 50;
+                blue = 80;
                 ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
                 ctx.fillRect(i, j, 1, 1);
             }

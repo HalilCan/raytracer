@@ -70,6 +70,14 @@ class Sphere {
   }
 }
 
+class pointLight {
+  constructor(location, intensity, color) {
+    this.location = location;
+    this.intensity = intensity;
+    this.color = color;
+  }
+}
+
 ///////////////////////////////////////////////////////////////
 
 ///////////////////////// Main Actions ////////////////////////
@@ -247,7 +255,7 @@ function raySphereCollisionMagnitude(Ray, Sphere) {
   if (t1 == t2) {
     return [1, t1, t2];
   } else {
-    return [2, t1, t2];
+    return [2, t1, t2];    
   }
 }
 
@@ -274,12 +282,13 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
 }
 
 function raySphCollisionTest() {
-  let sphereArray = createRandomSpheres(-20, 20, -20, 20, 5, 100, 8, 22, ["white", "green", "red", "blue", "yellow", "cyan", "violet"]);
+  let sphereArray = createRandomSpheres(-20, 20, -20, 20, 5, 100, -100, 22, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   render(sphereArray);
 }
 
 /////////////////////////////////////////
+/* Render function for arbitrary objects (spheres only currently) */
 function render(objects) {
   let alpha = 0, beta = 0;
   let xMin = 9999, yMin = 9999;
@@ -309,45 +318,53 @@ function render(objects) {
   }
 
   for (let i = 0; i < screenW; i++) {
-      for (let j = 0; j < screenH; j++) {
-          alpha = (i + 1) / screenW;
-          beta = (j + 1) / screenH;
-          let p = bilinearInterpolate(alpha, beta);
-          let direction = p.subtract(camPosition);
-        
-          if (rayCastDebug) {
-              let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
-              let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
-              red = xScale * 255;
-              green = yScale * 255;
-              blue = 80;
-              ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
-              ctx.fillRect(i, j, 1, 1);
-          }
+    for (let j = 0; j < screenH; j++) {
+        alpha = (i + 1) / screenW;
+        beta = (j + 1) / screenH;
+        let p = bilinearInterpolate(alpha, beta);
+        let direction = p.subtract(camPosition);
+      
+        if (rayCastDebug) {
+            let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
+            let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
+            red = xScale * 255;
+            green = yScale * 255;
+            blue = 80;
+            ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
+            ctx.fillRect(i, j, 1, 1);
+        }
 
-          let ray = new Ray(p, direction);
-          let minColMagn = 9999;
-          let closestObj;
-          for (let obj of objects) {
-            let rayCastResult = raySphereCollisionMagnitude(ray, obj);
-            if (rayCastResult[0] > 0) {
-              if (rayCastResult[1] < minColMagn) {
-                minColMagn = rayCastResult[1];
-                closestObj = obj;
-              }
-              if (rayCastResult[2] < minColMagn) {
-                minColMagn = rayCastResult[2];
-                closestObj = obj;
+        let ray = new Ray(p, direction);
+        let minColMagn = 9999;
+        let closestObj;
+        let isEdge = 0;
+        for (let obj of objects) {
+          let rayCastResult = raySphereCollisionMagnitude(ray, obj);
+          if (rayCastResult[0] > 0) {
+            if (rayCastResult[1] < minColMagn && rayCastResult[1] > 0) {
+              minColMagn = rayCastResult[1];
+              closestObj = obj;
+              if(rayCastResult[1] == rayCastResult[2]) {
+                isEdge = 1;
+              } else {
+                isEdge = 0; //interesting, i'm not sure why I can't observe this behavior.
               }
             }
+            if (rayCastResult[2] < minColMagn && rayCastResult[2] > 0) {
+              minColMagn = rayCastResult[2];
+              closestObj = obj;
+            }
           }
-          if (minColMagn != 9999) {
+        }
+        if (minColMagn != 9999) {
+          if (isEdge) {
+            ctx.fillStyle = "black";
+          } else {
             ctx.fillStyle = closestObj.color;
-            ctx.fillRect(i,j, 1,1);
-          }
-      }
+          }            
+          ctx.fillRect(i,j, 1,1);
+        }
+    }
   }
 }
-
-
-///////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////

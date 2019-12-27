@@ -1,5 +1,5 @@
 ///////////////////////////// Flags //////////////////////////////
-let rayCastDebug = 1;
+let rayCastDebug = 0;
 //unfortunately everything is placed in this one mega-file, 
 //for some reason local development with js modules is prohibitive
 //////////////////////////////////////////////////////////////////
@@ -109,8 +109,8 @@ function initCanvas() {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, screenW, screenH);
 
-    //raySphCollisionTest();
-    raySphCollisionTestOcclusion();
+    raySphCollisionTest();
+    
 }
 window.onload = initCanvas;
 
@@ -176,57 +176,6 @@ function bilinearInterpolate(alpha, beta) {
 }
 //////////////////////////////////////////////////////////
 // sphere geometry collision detection //
-/*
-Simple quadratic equation problem.
-  Let the ray be O+Vt (vectors capitalized) where O is the 
-origin and V is the direction vector.
-  Given a sphere descibed by C,r where C is the center and
-r is the radius, if the ray collides with the sphere at all,
-it must intersect its surface at least once. Therefore we have
-the equations where for some t
-  SQRT((|O+Vt|)^2 +- r^2) = |C|, 
-  or |C-(O+Vt)| = r.
-  Thus Cx^2-(Ox^2+(Vx*t)^2)+Cx^2-(Ox^2+(Vx*t)^2)+Cx^2-(Ox^2+(Vx*t)^2) = r^2 
-  or C^2-O^2-V^2*t^2 = r^2
-  thus t = SQRT((C^2-O^2-r^2)/V^2)
-
-  2: Let's use this: 
-  |(O+Vt)-C| = r 
-  <O+Vt-C, O+Vt-C> = r^2
-  let D = O-C;
-  <D+Vt, D+Vt> = r^2
-  <D+Vt, D> + <D+Vt, Vt> = r^2
-  <D,D> + 2<D,Vt> + <Vt, Vt> = r^2
-  V^2(t^2) + 2t<D,Vt> + D^2 = r^2
-  quadratic form:  V^2(t^2) + 2t<D,V> + (D^2-r^2) = 0
-  quadratic solution for t = (-2<D,V> +- sqrt((2<D,V>)^2 - 4*V^2*(D^2-r^2)))/4<D,V> 
-  two solutions: the smaller is the first collision
-  one solution: graze
-  no solutions: no collisions (check for sqrt of a negative value or b is 0)
-
-  ////////////////// ignore below
-  quadratic: V^2t^2+ 0(zero)*t + (O^2-C^2-r^2) = 0
-  thus t = +-SQRT(4*V^2*(O^2-C^2-r^2))/2*V^2
-  or, relevant to us: t= +- SQRT(O.norm()-C.norm()-r*r)/V.norm()
-  let t = C.norm())+k
-  Thus k = t - C.norm(). If t is positive, there is a collision beyond O,
-  if t is negative, there is a collision before O.   
-*/
-function getQuadraticIntersectionsObj(quadValue, equationFunction) {
-  let obj = {
-    count: 0,
-    intersections: []
-  };
-  if (equationFunction(quadValue)) {
-    obj.count ++;
-    obj.intersections.push(quadValue);
-  }
-  if (equationFunction(-quadValue)) {
-    obj.count ++;
-    obj.intersections.push(quadValue);
-  }
-  return obj;
-}
 
 function raySphereCollisionMagnitude(Ray, Sphere) {
   let C = Sphere.center;
@@ -240,23 +189,31 @@ function raySphereCollisionMagnitude(Ray, Sphere) {
   let Dsq = D.dot(D);
   let rsq = r*r;
 
-  let k = Math.pow((2*dv),2) - 4*Vsq*(Dsq-rsq);
+  let a = Vsq;
+  let b = 2*dv;
+  let c = Dsq - rsq; 
 
-  if (k < 0) {
-    return [0, 0, 0];
+  let discriminant = b*b - 4*a*c;
+
+  if (discriminant < 0) {
+    return -1;
   }
-  if (dv == 0) {
-    return [0, 0, 0];
-  }
-
-  //quadratic solution for t = (-2<D,V> +- sqrt((2<D,V>)^2 - 4*V^2*(D^2-r^2)))/4<D,V>   
-  let t1 = (-2*dv + k) / 4*dv;
-  let t2 = (-2*dv - k) / 4*dv;
-
-  if (t1 == t2) {
-    return [1, t1, t2];
+       
+  let t1 = (-b + Math.sqrt(discriminant)) / 2*a;
+  let t2 = (-b - Math.sqrt(discriminant)) / 2*a;
+  
+  if (t1 < 0) {
+    if (t2 < 0) {
+      return -2;
+    } else {
+      return t2;
+    }
   } else {
-    return [2, t1, t2];    
+    if (t2 < 0) {
+      return t1;
+    } else {
+      return Math.min(t1, t2)
+    }
   }
 }
 
@@ -291,7 +248,7 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
 }
 
 function raySphCollisionTest() {
-  let sphereArray = createRandomSpheres(1, 2, 1, 2, 10, 20, 7, 3, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
+  let sphereArray = createRandomSpheres(-10, 10, -10, 10, 20, 40, 5, 5, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   render(sphereArray);
 }
@@ -347,9 +304,9 @@ function raySphCollisionTestMinRadiusNegZ() {
   let c9 = new Vector(35,1,-50);
   let c10 = new Vector(55,1,-50);
 
-  let s1 = new Sphere(c1, -10, "red");
-  let s2 = new Sphere(c2, -5, "white");
-  let s3 = new Sphere(c3, -1, "green");
+  let s1 = new Sphere(c1, 10, "red");
+  let s2 = new Sphere(c2, 5, "white");
+  let s3 = new Sphere(c3, 1, "green");
   let s4 = new Sphere(c4, 0, "red");
   let s5 = new Sphere(c5, 1, "red");
   let s6 = new Sphere(c6, 2, "red");
@@ -372,37 +329,33 @@ function raySphCollisionTestMinRadiusNegZ() {
 
 function raySphCollisionTestOcclusion() {
   let sphereArray = [];
+  let c7 = new Vector(2,-2,10);
+  let c8 = new Vector(-2,-2,20);
+  let c9 = new Vector(-2,2,30);
+  let c10 = new Vector(2,2,40);
+  let s7 = new Sphere(c7, 3, "blue");
+  let s8 = new Sphere(c8, 3, "cyan");
+  let s9 = new Sphere(c9, 3, "brown");
+  let s10 = new Sphere(c10, 3, "violet");
 
-  let c1 = new Vector(1,1,-50);
-  let c2 = new Vector(1,1,-40);
-  let c3 = new Vector(1,1,-30);
-  let c4 = new Vector(1,1,-20);
-  let c5 = new Vector(1,1,-10);
-  //let c6 = new Vector(1,1,0);
-  let c7 = new Vector(1,1,10);
+  sphereArray.push(s7, s8, s9, s10);  
+
+  console.log(sphereArray);
+  render(sphereArray);
+}
+function raySphCollisionTestOcclusionSameCoords() {
+  let sphereArray = [];
+  let c7 = new Vector(1,1,20);
   let c8 = new Vector(1,1,20);
-  let c9 = new Vector(1,1,30);
-  let c10 = new Vector(1,1,40);
-
-  let s1 = new Sphere(c1, 5, "red");
-  let s2 = new Sphere(c2, 5, "white");
-  let s3 = new Sphere(c3, 5, "green");
-  let s4 = new Sphere(c4, 5, "yellow");
-  let s5 = new Sphere(c5, 5, "orange");
-  //let s6 = new Sphere(c6, 5, "black");
+  let c9 = new Vector(1,1,20);
+  let c10 = new Vector(1,1,20);
   let s7 = new Sphere(c7, 5, "blue");
-  let s8 = new Sphere(c8, 5, "cyan");
-  let s9 = new Sphere(c9, 5, "brown");
-  let s10 = new Sphere(c10, 5, "violet");
+  let s8 = new Sphere(c8, 7, "cyan");
+  let s9 = new Sphere(c9, 8, "brown");
+  let s10 = new Sphere(c10, 9, "violet");
 
-  sphereArray.push(s1, s2, s3, s4, s5, s7, s8, s9, s10);  
-  /*
-  //Same center, different radius, should only see the larger one  
-  let c1 = new Vector(1,1,1);
-  let c2 = new Vector(1,1,1);
-  let s1 = new Sphere(c1)
-  */
-
+  sphereArray.push(s7, s8, s9, s10);  
+  
   console.log(sphereArray);
   render(sphereArray);
 }
@@ -456,31 +409,20 @@ function render(objects) {
         }
 
         let ray = new Ray(p, direction);
-        let minColMagn = -9999;
+        let minColMagn = Number.POSITIVE_INFINITY;
         let closestObj, rayCastResult;
         let isEdge = 0;
         for (let obj of objects) {
           rayCastResult = raySphereCollisionMagnitude(ray, obj);
-          if (rayCastResult[0] > 0) {
-            if (rayCastResult[1] > minColMagn && rayCastResult[1] < 0) {
-              if (i%50 == 0) {
+          if (rayCastResult > 1) {
+              if (i % 50 == 0) {
                 console.log(obj, ray, rayCastResult);
               }
-              minColMagn = rayCastResult[1];
-              closestObj = obj;
-              if(rayCastResult[1] == rayCastResult) {
-                isEdge = 1;
-              } else {
-                isEdge = 0; //interesting, i'm not sure why I can't observe this behavior.
-              }
-            }
-            if (rayCastResult[2] > minColMagn && rayCastResult[2] < 0) {
-              minColMagn = rayCastResult[2];
+              minColMagn = rayCastResult;
               closestObj = obj;
             }
-          }
         }
-        if (minColMagn != 9999) {
+        if (Number.isFinite(minColMagn)) {
           if (isEdge) {
             ctx.fillStyle = "black";
           } else {

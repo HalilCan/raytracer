@@ -98,7 +98,7 @@ function initCanvas() {
     ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, screenW, screenH);
 
-    ctx.fillStyle = 'green';
+    ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, screenW, screenH);
 
     raySphCollisionTest();
@@ -264,7 +264,7 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
     randY = getRandomIntInRange(minY, maxY);
     randZ = getRandomIntInRange(minZ, maxZ);
     center = new Vector(randX, randY, randZ);
-    randRadius = getRandomIntInRange(0, radiusMaximus);
+    randRadius = getRandomIntInRange(1, radiusMaximus);
     color = colorArray[getRandomIntInRange(0, colorArray.length)];
 
     let sphere = new Sphere(center, randRadius, color);
@@ -274,7 +274,7 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
 }
 
 function raySphCollisionTest() {
-  let sphereArray = createRandomSpheres(-10, 10, -10, 10, -2, 10, 8, 12, ["white", "green", "red", "blue"]);
+  let sphereArray = createRandomSpheres(-20, 20, -20, 20, 5, 100, 8, 22, ["white", "green", "red", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   render(sphereArray);
 }

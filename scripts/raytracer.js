@@ -109,7 +109,8 @@ function initCanvas() {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, screenW, screenH);
 
-    raySphCollisionTest();
+    //raySphCollisionTest();
+    raySphCollisionTestOcclusion();
 }
 window.onload = initCanvas;
 
@@ -235,8 +236,8 @@ function raySphereCollisionMagnitude(Ray, Sphere) {
 
   let D = O.subtract(C);
   let dv = D.dot(V);
-  let Vsq = V.norm()*V.norm();
-  let Dsq = D.norm()*D.norm();
+  let Vsq = V.dot(V);
+  let Dsq = D.dot(D);
   let rsq = r*r;
 
   let k = Math.pow((2*dv),2) - 4*Vsq*(Dsq-rsq);
@@ -263,6 +264,13 @@ function getRandomIntInRange(min, max) {
   return min + Math.floor(Math.random()*(max-min));
 }
 
+function getRandomRGB() {
+  let r = getRandomIntInRange(0,255);
+  let g = getRandomIntInRange(0,255);
+  let b = getRandomIntInRange(0,255);
+  return "rgb("+r+","+g+","+b+")";
+}
+
 function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, count, colorArray) {
   let sphereArray = [];
   let randX, randY, randRadius, center, color;
@@ -274,6 +282,7 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
     center = new Vector(randX, randY, randZ);
     randRadius = getRandomIntInRange(1, radiusMaximus);
     color = colorArray[getRandomIntInRange(0, colorArray.length)];
+    //color = getRandomRGB();
 
     let sphere = new Sphere(center, randRadius, color);
     sphereArray.push(sphere);
@@ -282,7 +291,118 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
 }
 
 function raySphCollisionTest() {
-  let sphereArray = createRandomSpheres(-20, 20, -20, 20, 5, 100, -100, 22, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
+  let sphereArray = createRandomSpheres(1, 2, 1, 2, 10, 20, 7, 3, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
+  console.log(sphereArray);
+  render(sphereArray);
+}
+
+function raySphCollisionTestMinRadius() {
+  let sphereArray = [];
+
+  let c1 = new Vector(-50,1,50);
+  let c2 = new Vector(-40,1,50);
+  let c3 = new Vector(-30,1,50);
+  let c4 = new Vector(-20,1,50);
+  let c5 = new Vector(-10,1,50);
+  let c6 = new Vector(0,1,50);
+  let c7 = new Vector(10,1,50);
+  let c8 = new Vector(20,1,50);
+  let c9 = new Vector(35,1,50);
+  let c10 = new Vector(55,1,50);
+
+  let s1 = new Sphere(c1, -10, "red");
+  let s2 = new Sphere(c2, -5, "white");
+  let s3 = new Sphere(c3, -1, "green");
+  let s4 = new Sphere(c4, 0, "red");
+  let s5 = new Sphere(c5, 1, "red");
+  let s6 = new Sphere(c6, 2, "red");
+  let s7 = new Sphere(c7, 3, "red");
+  let s8 = new Sphere(c8, 4, "red");
+  let s9 = new Sphere(c9, 5, "red");
+  let s10 = new Sphere(c10, 6, "red");
+
+  sphereArray.push(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10);  
+  /*
+  //Same center, different radius, should only see the larger one  
+  let c1 = new Vector(1,1,1);
+  let c2 = new Vector(1,1,1);
+  let s1 = new Sphere(c1)
+  */
+
+  console.log(sphereArray);
+  render(sphereArray);
+}
+
+function raySphCollisionTestMinRadiusNegZ() {
+  let sphereArray = [];
+
+  let c1 = new Vector(-50,1,-50);
+  let c2 = new Vector(-40,1,-50);
+  let c3 = new Vector(-30,1,-50);
+  let c4 = new Vector(-20,1,-50);
+  let c5 = new Vector(-10,1,-50);
+  let c6 = new Vector(0,1,-50);
+  let c7 = new Vector(10,1,-50);
+  let c8 = new Vector(20,1,-50);
+  let c9 = new Vector(35,1,-50);
+  let c10 = new Vector(55,1,-50);
+
+  let s1 = new Sphere(c1, -10, "red");
+  let s2 = new Sphere(c2, -5, "white");
+  let s3 = new Sphere(c3, -1, "green");
+  let s4 = new Sphere(c4, 0, "red");
+  let s5 = new Sphere(c5, 1, "red");
+  let s6 = new Sphere(c6, 2, "red");
+  let s7 = new Sphere(c7, 3, "red");
+  let s8 = new Sphere(c8, 4, "red");
+  let s9 = new Sphere(c9, 5, "red");
+  let s10 = new Sphere(c10, 6, "red");
+
+  sphereArray.push(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10);  
+  /*
+  //Same center, different radius, should only see the larger one  
+  let c1 = new Vector(1,1,1);
+  let c2 = new Vector(1,1,1);
+  let s1 = new Sphere(c1)
+  */
+
+  console.log(sphereArray);
+  render(sphereArray);
+}
+
+function raySphCollisionTestOcclusion() {
+  let sphereArray = [];
+
+  let c1 = new Vector(1,1,-50);
+  let c2 = new Vector(1,1,-40);
+  let c3 = new Vector(1,1,-30);
+  let c4 = new Vector(1,1,-20);
+  let c5 = new Vector(1,1,-10);
+  //let c6 = new Vector(1,1,0);
+  let c7 = new Vector(1,1,10);
+  let c8 = new Vector(1,1,20);
+  let c9 = new Vector(1,1,30);
+  let c10 = new Vector(1,1,40);
+
+  let s1 = new Sphere(c1, 5, "red");
+  let s2 = new Sphere(c2, 5, "white");
+  let s3 = new Sphere(c3, 5, "green");
+  let s4 = new Sphere(c4, 5, "yellow");
+  let s5 = new Sphere(c5, 5, "orange");
+  //let s6 = new Sphere(c6, 5, "black");
+  let s7 = new Sphere(c7, 5, "blue");
+  let s8 = new Sphere(c8, 5, "cyan");
+  let s9 = new Sphere(c9, 5, "brown");
+  let s10 = new Sphere(c10, 5, "violet");
+
+  sphereArray.push(s1, s2, s3, s4, s5, s7, s8, s9, s10);  
+  /*
+  //Same center, different radius, should only see the larger one  
+  let c1 = new Vector(1,1,1);
+  let c2 = new Vector(1,1,1);
+  let s1 = new Sphere(c1)
+  */
+
   console.log(sphereArray);
   render(sphereArray);
 }
@@ -323,6 +443,7 @@ function render(objects) {
         beta = (j + 1) / screenH;
         let p = bilinearInterpolate(alpha, beta);
         let direction = p.subtract(camPosition);
+        //in our implementation, since p is between 0 and 1, whereas camPosition is at norm 1, we only consider negative t values later on.
       
         if (rayCastDebug) {
             let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
@@ -335,22 +456,25 @@ function render(objects) {
         }
 
         let ray = new Ray(p, direction);
-        let minColMagn = 9999;
-        let closestObj;
+        let minColMagn = -9999;
+        let closestObj, rayCastResult;
         let isEdge = 0;
         for (let obj of objects) {
-          let rayCastResult = raySphereCollisionMagnitude(ray, obj);
+          rayCastResult = raySphereCollisionMagnitude(ray, obj);
           if (rayCastResult[0] > 0) {
-            if (rayCastResult[1] < minColMagn && rayCastResult[1] > 0) {
+            if (rayCastResult[1] > minColMagn && rayCastResult[1] < 0) {
+              if (i%50 == 0) {
+                console.log(obj, ray, rayCastResult);
+              }
               minColMagn = rayCastResult[1];
               closestObj = obj;
-              if(rayCastResult[1] == rayCastResult[2]) {
+              if(rayCastResult[1] == rayCastResult) {
                 isEdge = 1;
               } else {
                 isEdge = 0; //interesting, i'm not sure why I can't observe this behavior.
               }
             }
-            if (rayCastResult[2] < minColMagn && rayCastResult[2] > 0) {
+            if (rayCastResult[2] > minColMagn && rayCastResult[2] < 0) {
               minColMagn = rayCastResult[2];
               closestObj = obj;
             }
@@ -363,6 +487,7 @@ function render(objects) {
             ctx.fillStyle = closestObj.color;
           }            
           ctx.fillRect(i,j, 1,1);
+          //console.log(closestObj, ray);
         }
     }
   }

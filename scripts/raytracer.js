@@ -192,7 +192,7 @@ class Scene {
       let intersection = this.getClosestIntersection(newRay);
       if (intersection != -1) {
         //get reflected color recursively
-        let targetObjectReflectivity = irentersection.object.material.reflectivityConstant;
+        let targetObjectReflectivity = intersection.object.material.reflectivityConstant;
         reflectedComponent = this.getColorThroughRay(newRay, intersection.pointOnObject, intersection.object, recursionDepth - 1);
         reflectedComponent = reflectedComponent.multiply(targetObjectReflectivity);
       }
@@ -218,28 +218,45 @@ class Scene {
       return -1;
     }
   }
-  getColorAtPixel(i, j, alpha, beta){ 
-    let p = bilinearInterpolate(alpha, beta);
-    let direction = p.subtract(this.camera.position);
+  getColorAtPixel(i, j, alpha, beta, antiAliasingSampleSize, aaIntW, aaIntH){ 
     let pixelColor = this.backgroundColor;
-    //in our implementation, since p is between 0 and 1, whereas camPosition is at norm 1, we only consider negative t values later on.
-  
-    if (rayCastDebug) {
-        let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
-        let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
-        red = xScale * 255;
-        green = yScale * 255;
-        blue = 80;
-        ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
-        ctx.fillRect(i, j, 1, 1);
+    let baseR = 0;
+    let baseG = 0;
+    let baseB = 0;
+    let p;
+
+    for (let aaI = 0; aaI < antiAliasingSampleSize; aaI++) {
+      for (let aaJ = 0; aaJ < antiAliasingSampleSize; aaJ++) {
+        p = bilinearInterpolate(alpha + aaIntW * aaI, beta + aaIntH * aaJ);
+        let direction = p.subtract(this.camera.position);
+        //in our implementation, since p is between 0 and 1, whereas camPosition is at norm 1, we only consider negative t values later on.
+      
+        if (rayCastDebug) {
+            let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
+            let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
+            red = xScale * 255;
+            green = yScale * 255;
+            blue = 80;
+            ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
+            ctx.fillRect(i, j, 1, 1);
+        }
+
+        let ray = new Ray(p, direction);
+        let intersection = this.getClosestIntersection(ray);
+        if (intersection != -1) {
+          pixelColor = this.getColorThroughRay(intersection.ray, intersection.pointOnObject, intersection.object, this.recursionDepth);
+          baseR += pixelColor.r;
+          baseG += pixelColor.g;
+          baseB += pixelColor.b;
+        }
+      } 
     }
 
-    let ray = new Ray(p, direction);
-    let intersection = this.getClosestIntersection(ray);
-    if (intersection != -1) {
-      pixelColor = this.getColorThroughRay(intersection.ray, intersection.pointOnObject, intersection.object, this.recursionDepth);
-    }
-    return pixelColor;      
+    baseR = baseR / (antiAliasingSampleSize*antiAliasingSampleSize);
+    baseG = baseG / (antiAliasingSampleSize*antiAliasingSampleSize);
+    baseB = baseB / (antiAliasingSampleSize*antiAliasingSampleSize);
+
+    return new Color(baseR, baseG, baseB);      
   }
   ambientTerm(object) {
     let amTerm = this.ambientLightIntensity.multiply(object.material.ambientConstant);
@@ -277,9 +294,10 @@ class Scene {
     return specularComponent;
   }
   /* Render function for arbitrary objects (spheres only currently) */
-  render() {
+  render(antiAliasingSampleSize) {
     let screenH = this.canvas.height;
     let screenW = this.canvas.width;
+    let aaSizeH, aaSizeW;
 
     let alpha = 0, beta = 0;
     let xMin = 9999, yMin = 9999;
@@ -310,9 +328,12 @@ class Scene {
 
     for (let i = 0; i < screenW; i++) {
       for (let j = 0; j < screenH; j++) {
+          aaSizeW = 1 / (screenH * antiAliasingSampleSize);
+          aaSizeH = 1 / (screenW * antiAliasingSampleSize);
           alpha = (i + 1) / screenW;
           beta = (j + 1) / screenH;
-          let pixelColor = this.getColorAtPixel(i, j, alpha, beta);
+          
+          let pixelColor = this.getColorAtPixel(i, j, alpha, beta, antiAliasingSampleSize, aaSizeW, aaSizeH);
           pixelColor = pixelColor.getFullScale(255);
 
           ctx.fillStyle = "rgb("+pixelColor.r+","+pixelColor.g+","+pixelColor.b+")";
@@ -487,7 +508,7 @@ function createRandomMaterial(reflectivityAdjustment) {
   let ambientConstant = new Color (r, g, b);
   let specularConstant = new Color (r, g, b);
   
-  let diffuseConstant = new Color (r/reflectivityAdjustment, g/reflectivityAdjustment, b/reflectivityAdjustment);
+  let diffuseConstant = new Color (clamp(0,1,r/reflectivityAdjustment), clamp(0,1,g/reflectivityAdjustment), clamp(0,1,b/reflectivityAdjustment));
   let reflectivityConstant = new Color (clamp(0,1,r*reflectivityAdjustment), clamp(0,1,g*reflectivityAdjustment), clamp(0,1,b*reflectivityAdjustment));
 
   let shininess = Math.floor(Math.random()*100) + 1;
@@ -505,7 +526,7 @@ function getRandomVector(minX, maxX, minY, maxY, minZ, maxZ) {
 function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, count, colorArray) {
   let sphereArray = [];
   let randX, randY, randZ, randRadius, center, color, material;
-  let reflectivityAdjustment = 1;
+  let reflectivityAdjustment = 0.5;
 
   for (let i = 0; i < count; i++) {
     randX = getRandomIntInRange(minX, maxX);
@@ -549,14 +570,14 @@ function clamp (min, max, val) {
 }
 
 function raySphCollisionTest() {
-  let objCount = 8;
-  let maxRadius = 8;
-  let sphereArray = createRandomSpheres(-15, 15, -15, 15, 20, 30, maxRadius, objCount, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
+  let objCount = 10;
+  let maxRadius = 20;
+  let sphereArray = createRandomSpheres(-30, 30, -30, 30, 40, 80, maxRadius, objCount, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   scene.objects = sphereArray;
 
-  let oneLightTest = 1;
-  let multiLightCount = 1;
+  let oneLightTest = 0;
+  let multiLightCount = 3;
   let lightArray = [];
 
   if (oneLightTest) {
@@ -574,7 +595,7 @@ function raySphCollisionTest() {
   }
   scene.lights = lightArray;
   console.log(lightArray);
-  scene.render();
+  scene.render(2);
 }
 /////////////////////////////////////////
 

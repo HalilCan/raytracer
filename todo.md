@@ -12,4 +12,13 @@
     For now let's just do direct light effect.
     DONE
 6. Shadows
-   At each illumination construction section, if the light ray intersects another object between the original point on object and the light's position, ignore specular and diffuse components of the local light value.
+        At each illumination construction section, if the light ray intersects another object between the original point on object and the light's position, ignore specular and diffuse components of the local light value.
+   DONE
+7. Reflections
+        Material should have reflectivity constant. 
+        diffuse constant and reflectivity constant are roughly inversely related. 
+8. Distributed ray tracing and anti-aliasing
+9.  Edge detection (t difference limit)
+10. Multisampling antialiasing (SAA at the edges)
+11. Soft shadows
+        By modeling a light source as a 2D interval and distributing shadow rays over that interval, soft shadows can be rendered.

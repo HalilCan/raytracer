@@ -40,6 +40,15 @@ class Vector {
   }
 }
 
+class Intersection {
+  constructor(ray, magnitude, object, pointOnObject) {
+    this.ray = ray;
+    this.magnitude = magnitude;
+    this.object = object;
+    this.pointOnObject = pointOnObject;
+  }
+}
+
 class ImagePlane {
   constructor(v1, v2, v3, v4) {
     this.v1 = v1;
@@ -86,10 +95,11 @@ class pointLight {
 }
 
 class Material {
-  constructor(ambientConstant, diffuseConstant, specularConstant, shininess) {
+  constructor(ambientConstant, diffuseConstant, specularConstant, reflectivityConstant, shininess) {
     this.ambientConstant = ambientConstant; // this is the percentage of ambient light the material reflects
     this.diffuseConstant = diffuseConstant; // this is the percentage of diffuse light the material reflects
     this.specularConstant = specularConstant; // % spec light the material reflects
+    this.reflectivityConstant = reflectivityConstant; // % light reflected onto other objects 
     this.shininess = shininess; // alpha shininess factor
   }
 }
@@ -125,18 +135,93 @@ class Color { //values between 0 and 1
 }
 
 class Scene {
-  constructor(canvas, camera, imagePlane, objects, lights, ambientLightIntensity) {
+  constructor(canvas, camera, imagePlane, objects, lights, ambientLightIntensity, recursionDepth, backgroundColor) {
     this.camera = camera;
     this.canvas = canvas;
     this.imagePlane = imagePlane;
     this.objects = objects;
     this.lights = lights;
     this.ambientLightIntensity = ambientLightIntensity;
+    this.recursionDepth = recursionDepth;
+    this.backgroundColor = backgroundColor;
+  }
+  getColorThroughRay(incomingRay, pointOnObj, obj, recursionDepth) {
+    //calculate normal color at pointOnObj
+    let ambientComponent = this.ambientTerm(obj);
+    let specularComponent = new Color(0, 0, 0);
+    let diffuseComponent = new Color(0, 0, 0);
+    let reflectedComponent = new Color(0, 0, 0);
+  
+    for (let light of this.lights) {
+      let fullLightVector = (light.position.subtract(pointOnObj));
+      let lightRay = new Ray(pointOnObj, fullLightVector);
+      let t = 1;
+      for (let shadowObj of this.objects) {
+        if (shadowObj != obj) {
+          t = raySphereCollisionMagnitude(lightRay, shadowObj);
+          if (t > 0 && t < 1) {
+            break;
+          }
+        }
+      }
+      if (!(t > 0 && t < 1)) {
+        let specTerm = this.specularTerm(obj, light, this.camera, pointOnObj);
+        if (specTerm != -1) {
+          specularComponent = specularComponent.add(specTerm);
+        }
+        let diffTerm = this.diffuseTerm(obj, light, pointOnObj);
+        if (diffTerm != -1) {
+          diffuseComponent = diffuseComponent.add(diffTerm);
+        }
+      } 
+    }
+    let rayColorWithoutReflection = ambientComponent.add(specularComponent).add(diffuseComponent);
+    //if recursion continues, cast another ray from pointOnObj, find out whether it intersects another obj
+    //calculate reflectance vector
+    let V = incomingRay.direction.scale(-1)
+      .unitVec();
+    let N = obj.surfaceNormal(pointOnObj);
+    let R = ((N.scale((2 * (N.dot(V)))))
+      .subtract(V))
+      .unitVec();
+    
+    let newRay = new Ray(pointOnObj, R);
+    //if it does, call this function recursively on that, return color at pointOnObj + kr-adjusted recursive color    
+    if (recursionDepth > 0) {
+      //check for intersection
+      let intersection = this.getClosestIntersection(newRay);
+      if (intersection != -1) {
+        //get reflected color recursively
+        let targetObjectReflectivity = intersection.object.material.reflectivityConstant;
+        reflectedComponent = this.getColorThroughRay(newRay, intersection.pointOnObject, intersection.object, recursionDepth - 1);
+        reflectedComponent = reflectedComponent.scale(targetObjectReflectivity);
+      }
+    }
+    //if it does not, or if the recursion does not continue, return color at pointOnObj
+    return rayColorWithoutReflection.add(reflectedComponent);
+  }
+  getClosestIntersection(ray) {
+    let minColMagn = Number.POSITIVE_INFINITY;
+    let pointOnObj, rayCastResult, closestObj;
+    for (let obj of this.objects) {
+      rayCastResult = raySphereCollisionMagnitude(ray, obj);
+      if (rayCastResult > 1 && rayCastResult < minColMagn) {
+          minColMagn = rayCastResult;
+          closestObj = obj;
+      }
+    }
+    if (Number.isFinite(minColMagn)) {
+      pointOnObj = ray.origin.add(ray.direction.scale(minColMagn));
+      ray = new Intersection(ray, minColMagn, closestObj, pointOnObj);
+      return ray;
+    } else {
+      return -1;
+    }
   }
   getColorAtPixel(i, j, alpha, beta){ 
     let p = bilinearInterpolate(alpha, beta);
     let direction = p.subtract(this.camera.position);
-    let pixelColor = new Color(0, 0, 0);
+    let pixelColor = this.backgroundColor;
     //in our implementation, since p is between 0 and 1, whereas camPosition is at norm 1, we only consider negative t values later on.
   
     if (rayCastDebug) {
@@ -150,47 +235,9 @@ class Scene {
     }
 
     let ray = new Ray(p, direction);
-    let minColMagn = Number.POSITIVE_INFINITY;
-    let closestObj, rayCastResult;
-    for (let obj of this.objects) {
-      rayCastResult = raySphereCollisionMagnitude(ray, obj);
-      if (rayCastResult > 1 && rayCastResult < minColMagn) {
-          minColMagn = rayCastResult;
-          closestObj = obj;
-      }
-    }
-    if (Number.isFinite(minColMagn)) {
-      let pointOnObj = p.add(direction.scale(minColMagn));
-
-      let ambientComponent = this.ambientTerm(closestObj);
-      let specularComponent = new Color(0, 0, 0);
-      let diffuseComponent = new Color(0, 0, 0);
-
-      for (let light of this.lights) {
-        let fullLightVector = (light.position.subtract(pointOnObj));
-        let lightRay = new Ray(pointOnObj, fullLightVector);
-        let t = 1;
-        for (let shadowObj of this.objects) {
-          if (shadowObj != closestObj) {
-            t = raySphereCollisionMagnitude(lightRay, shadowObj);
-            if (t > 0 && t < 1) {
-              break;
-            }
-          }
-        }
-        if (!(t > 0 && t < 1)) {
-          let specTerm = this.specularTerm(closestObj, light, this.camera, pointOnObj);
-          if (specTerm != -1) {
-            specularComponent = specularComponent.add(specTerm);
-          }
-          let diffTerm = this.diffuseTerm(closestObj, light, pointOnObj);
-          if (diffTerm != -1) {
-            diffuseComponent = diffuseComponent.add(diffTerm);
-          }
-        } 
-      }
-
-      pixelColor = ambientComponent.add(specularComponent).add(diffuseComponent);
+    let intersection = this.getClosestIntersection(ray);
+    if (intersection != -1) {
+      pixelColor = this.getColorThroughRay(intersection.ray, intersection.pointOnObject, intersection.object, this.recursionDepth);
     }
     return pixelColor;      
   }
@@ -309,8 +356,12 @@ function init() {
 
     //let ambientLightIntensity = new Color(0, 0, 0);
     let ambientLightIntensity = new Color(0.1, 0.1, 0.1);
+
+    let recursionDepth = 2;
+
+    let backgroundColor = new Color(0, 0, 0);
     
-    scene = new Scene(canvas, camera, imagePlane, [], [], ambientLightIntensity);
+    scene = new Scene(canvas, camera, imagePlane, [], [], ambientLightIntensity, recursionDepth, backgroundColor);
     raySphCollisionTest();
 }
 window.onload = init;
@@ -429,15 +480,18 @@ function getRandomRGB() {
   return "rgb("+r+","+g+","+b+")";
 }
 
-function createRandomMaterial() {
+function createRandomMaterial(reflectivityAdjustment) {
   let r = Math.random();
   let g = Math.random();
   let b = Math.random();
   let ambientConstant = new Color (r, g, b);
-  let diffuseConstant = new Color (r, g, b);
   let specularConstant = new Color (r, g, b);
+  
+  let diffuseConstant = new Color (r/reflectivityAdjustment, g/reflectivityAdjustment, b/reflectivityAdjustment);
+  let reflectivityConstant = new Color (clamp(0,1,r*reflectivityAdjustment), clamp(0,1,g*reflectivityAdjustment), clamp(0,1,b*reflectivityAdjustment));
+
   let shininess = Math.floor(Math.random()*100) + 1;
-  return new Material(ambientConstant, diffuseConstant, specularConstant, shininess);
+  return new Material(ambientConstant, diffuseConstant, specularConstant, reflectivityConstant, shininess);
 }
 
 function getRandomVector(minX, maxX, minY, maxY, minZ, maxZ) {
@@ -451,6 +505,7 @@ function getRandomVector(minX, maxX, minY, maxY, minZ, maxZ) {
 function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, count, colorArray) {
   let sphereArray = [];
   let randX, randY, randZ, randRadius, center, color, material;
+  let reflectivityAdjustment = 2;
 
   for (let i = 0; i < count; i++) {
     randX = getRandomIntInRange(minX, maxX);
@@ -460,7 +515,7 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
     randRadius = getRandomIntInRange(1, radiusMaximus);
     //color = colorArray[getRandomIntInRange(0, colorArray.length)];
     color = new Color(Math.random(), Math.random(), Math.random());
-    material = createRandomMaterial();
+    material = createRandomMaterial(reflectivityAdjustment);
 
     let sphere = new Sphere(center, randRadius, color, material);
     sphereArray.push(sphere);
@@ -494,12 +549,13 @@ function clamp (min, max, val) {
 }
 
 function raySphCollisionTest() {
-  let objCount = 10;
-  let sphereArray = createRandomSpheres(-10, 10, -10, 10, 20, 50, 10, objCount, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
+  let objCount = 12;
+  let maxRadius = 10;
+  let sphereArray = createRandomSpheres(-15, 15, -15, 15, 20, 30, maxRadius, objCount, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   scene.objects = sphereArray;
 
-  let oneLightTest = 0;
+  let oneLightTest = 1;
   let multiLightCount = 1;
   let lightArray = [];
 

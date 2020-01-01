@@ -194,8 +194,7 @@ class Scene {
         //get reflected color recursively
         let targetObjectReflectivity = intersection.object.material.reflectivityConstant;
         reflectedComponent = this.getColorThroughRay(newRay, intersection.pointOnObject, intersection.object, recursionDepth - 1);
-        reflectedComponent = reflectedComponent.scale(targetObjectReflectivity);
-        reflectedComponent = new Color(1, 1, 1);
+        reflectedComponent = reflectedComponent.multiply(targetObjectReflectivity);
       }
     }
     //if it does not, or if the recursion does not continue, return color at pointOnObj

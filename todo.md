@@ -19,7 +19,8 @@
         diffuse constant and reflectivity constant are roughly inversely related. 
     DONE
 8. Distributed ray tracing and anti-aliasing
-9.  Edge detection (t difference limit)
+    DONE
+9.  Edge detection (t difference limit, alpha/b limit?)
 10. Multisampling antialiasing (SAA at the edges)
 11. Soft shadows
         By modeling a light source as a 2D interval and distributing shadow rays over that interval, soft shadows can be rendered.

@@ -60,6 +60,9 @@ class Ray {
     this.origin = origin;
     this.direction = direction;
   }
+  intersects(object) {
+
+  }
 }
 
 class Sphere {
@@ -164,21 +167,30 @@ class Scene {
       let diffuseComponent = new Color(0, 0, 0);
 
       for (let light of this.lights) {
-        let specTerm = this.specularTerm(closestObj, light, this.camera, pointOnObj);
-        if (specTerm != -1) {
-          specularComponent = specularComponent.add(specTerm);
+        let fullLightVector = (light.position.subtract(pointOnObj));
+        let lightRay = new Ray(pointOnObj, fullLightVector);
+        let t = 1;
+        for (let shadowObj of this.objects) {
+          if (shadowObj != closestObj) {
+            t = raySphereCollisionMagnitude(lightRay, shadowObj);
+            if (t > 0 && t < 1) {
+              break;
+            }
+          }
         }
-        let diffTerm = this.diffuseTerm(closestObj, light, pointOnObj);
-        if (diffTerm != -1) {
-          diffuseComponent = diffuseComponent.add(diffTerm);
-        }
+        if (!(t > 0 && t < 1)) {
+          let specTerm = this.specularTerm(closestObj, light, this.camera, pointOnObj);
+          if (specTerm != -1) {
+            specularComponent = specularComponent.add(specTerm);
+          }
+          let diffTerm = this.diffuseTerm(closestObj, light, pointOnObj);
+          if (diffTerm != -1) {
+            diffuseComponent = diffuseComponent.add(diffTerm);
+          }
+        } 
       }
 
       pixelColor = ambientComponent.add(specularComponent).add(diffuseComponent);
-      let printProb = Math.random();
-      if (printProb < .01) {
-        console.log(ambientComponent, specularComponent, diffuseComponent);
-      }
     }
     return pixelColor;      
   }
@@ -215,12 +227,6 @@ class Scene {
     }
     
     let specularComponent = (light.specularIntensity.multiply(object.material.specularConstant)).scale(Math.pow(vr, object.material.shininess));
-    let printProb = Math.random();
-    if (printProb < .01) {
-      console.log("specComp:", specularComponent, reflectanceVector, viewVector, specularComponent);
-      console.log(light.specularIntensity, object.material.specularConstant, viewVector.dot(reflectanceVector), object.material.shininess, Math.pow(viewVector.dot(reflectanceVector) , object.material.shininess));
-      console.log("//");
-    }
     return specularComponent;
   }
   /* Render function for arbitrary objects (spheres only currently) */
@@ -468,8 +474,8 @@ function createRandomPointLights(xMin, xMax, yMin, yMax, zMin, zMax, count) {
   let light;
   
   for (let i = 0; i < count; i++) {
-    let diffuseIntensity = new Color(Math.random()/2,Math.random()/2,Math.random()/2);
-    let specularIntensity = new Color(Math.random()/2,Math.random()/2,Math.random()/2);
+    let diffuseIntensity = new Color(Math.random(),Math.random(),Math.random());
+    let specularIntensity = new Color(Math.random(),Math.random(),Math.random());
     let position = getRandomVector(xMin, xMax, yMin, yMax, zMin, zMax);
     light = new pointLight(position, diffuseIntensity, specularIntensity);
     lightArray.push(light);;
@@ -488,11 +494,12 @@ function clamp (min, max, val) {
 }
 
 function raySphCollisionTest() {
-  let sphereArray = createRandomSpheres(-20, 20, -20, 20, 40, 80, 10, 10, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
+  let objCount = 10;
+  let sphereArray = createRandomSpheres(-10, 10, -10, 10, 20, 50, 10, objCount, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   scene.objects = sphereArray;
 
-  let oneLightTest = 1;
+  let oneLightTest = 0;
   let multiLightCount = 1;
   let lightArray = [];
 
@@ -507,7 +514,7 @@ function raySphCollisionTest() {
     oneLight = new pointLight(lightPosition, new Color(0.2, 0.2, 0.7), new Color(0.2, 0.2, 0.8));
     lightArray.push(oneLight);
   } else {
-    lightArray = createRandomPointLights(-40, 40, -40, 40, 20, 60, multiLightCount);
+    lightArray = createRandomPointLights(-40, 40, -40, 40, 0, 20, multiLightCount);
   }
   scene.lights = lightArray;
   console.log(lightArray);

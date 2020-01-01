@@ -10,3 +10,6 @@
         1. Direct light effect of all lights
         2. Reflected light effect of all OTHER objects !(how to prevent infinite loop) 
     For now let's just do direct light effect.
+    DONE
+6. Shadows
+   At each illumination construction section, if the light ray intersects another object between the original point on object and the light's position, ignore specular and diffuse components of the local light value.

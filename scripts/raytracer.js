@@ -192,7 +192,7 @@ class Scene {
       let intersection = this.getClosestIntersection(newRay);
       if (intersection != -1) {
         //get reflected color recursively
-        let targetObjectReflectivity = intersection.object.material.reflectivityConstant;
+        let targetObjectReflectivity = irentersection.object.material.reflectivityConstant;
         reflectedComponent = this.getColorThroughRay(newRay, intersection.pointOnObject, intersection.object, recursionDepth - 1);
         reflectedComponent = reflectedComponent.multiply(targetObjectReflectivity);
       }

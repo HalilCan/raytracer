@@ -17,6 +17,7 @@
 7. Reflections
         Material should have reflectivity constant. 
         diffuse constant and reflectivity constant are roughly inversely related. 
+    DONE
 8. Distributed ray tracing and anti-aliasing
 9.  Edge detection (t difference limit)
 10. Multisampling antialiasing (SAA at the edges)

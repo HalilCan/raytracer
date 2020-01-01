@@ -23,11 +23,11 @@ class Vector {
     return new Vector(this.x * scalar, this.y * scalar, this.z * scalar);
   }
   norm(){
-    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    return Math.sqrt(this.dot(this));
   }
-  unitVec(v){
+  unitVec(){
     let norm = this.norm();
-    return new Vector(thix.x / norm, thix.y / norm, thix.z / norm);
+    return new Vector(this.x / norm, this.y / norm, this.z / norm);
   }
   dot(v){
     return (this.x * v.x + this.y * v.y + this.z * v.z);
@@ -63,19 +63,210 @@ class Ray {
 }
 
 class Sphere {
-  constructor(center, radius, color) {
+  constructor(center, radius, color, material) {
     this.center = center;
     this.radius = radius; 
     this.color = color;
+    this.material = material;
+  }
+  surfaceNormal(pointOnSurface) {
+    return (pointOnSurface.subtract(this.center)).unitVec();
   }
 }
 
 class pointLight {
-  constructor(location, intensity, color) {
-    this.location = location;
-    this.intensity = intensity;
-    this.color = color;
+  constructor(position, diffuseIntensity, specularIntensity) {
+    this.position = position;
+    this.diffuseIntensity = diffuseIntensity;
+    this.specularIntensity = specularIntensity;
   }
+}
+
+class Material {
+  constructor(ambientConstant, diffuseConstant, specularConstant, shininess) {
+    this.ambientConstant = ambientConstant; // this is the percentage of ambient light the material reflects
+    this.diffuseConstant = diffuseConstant; // this is the percentage of diffuse light the material reflects
+    this.specularConstant = specularConstant; // % spec light the material reflects
+    this.shininess = shininess; // alpha shininess factor
+  }
+}
+
+class Color { //values between 0 and 1
+  constructor(r, g, b) {
+    this.r = r;
+    this.g = g;
+    this.b = b;
+  }
+  getFullScale(scale) { //normally 255
+    return new Color(this.r*scale, this.g*scale, this.b*scale);
+  }
+  multiply(color) {
+    let newColor = new Color(this.r*color.r, this.g*color.g, this.b*color.b);
+    return newColor.clamp();
+  }
+  scale(scale) {
+    let newColor = new Color(this.r*scale, this.g*scale, this.b*scale);
+    return newColor.clamp();
+  }
+  add(color) {
+    let newColor = new Color(this.r+color.r , this.g+color.g , this.b+color.b);
+    return newColor.clamp();
+  }
+  subtract(color) {
+    let newColor = new Color(this.r-color.r , this.g-color.g , this.b-color.b);
+    return newColor.clamp();
+  }
+  clamp () {
+    return new Color(clamp(0,1,this.r),clamp(0,1,this.g),clamp(0,1,this.b));
+  }
+}
+
+class Scene {
+  constructor(canvas, camera, imagePlane, objects, lights, ambientLightIntensity) {
+    this.camera = camera;
+    this.canvas = canvas;
+    this.imagePlane = imagePlane;
+    this.objects = objects;
+    this.lights = lights;
+    this.ambientLightIntensity = ambientLightIntensity;
+  }
+  getColorAtPixel(i, j, alpha, beta){ 
+    let p = bilinearInterpolate(alpha, beta);
+    let direction = p.subtract(this.camera.position);
+    let pixelColor = new Color(0, 0, 0);
+    //in our implementation, since p is between 0 and 1, whereas camPosition is at norm 1, we only consider negative t values later on.
+  
+    if (rayCastDebug) {
+        let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
+        let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
+        red = xScale * 255;
+        green = yScale * 255;
+        blue = 80;
+        ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
+        ctx.fillRect(i, j, 1, 1);
+    }
+
+    let ray = new Ray(p, direction);
+    let minColMagn = Number.POSITIVE_INFINITY;
+    let closestObj, rayCastResult;
+    for (let obj of this.objects) {
+      rayCastResult = raySphereCollisionMagnitude(ray, obj);
+      if (rayCastResult > 1 && rayCastResult < minColMagn) {
+          minColMagn = rayCastResult;
+          closestObj = obj;
+      }
+    }
+    if (Number.isFinite(minColMagn)) {
+      let pointOnObj = p.add(direction.scale(minColMagn));
+
+      let ambientComponent = this.ambientTerm(closestObj);
+      let specularComponent = new Color(0, 0, 0);
+      let diffuseComponent = new Color(0, 0, 0);
+
+      for (let light of this.lights) {
+        let specTerm = this.specularTerm(closestObj, light, this.camera, pointOnObj);
+        if (specTerm != -1) {
+          specularComponent = specularComponent.add(specTerm);
+        }
+        let diffTerm = this.diffuseTerm(closestObj, light, pointOnObj);
+        if (diffTerm != -1) {
+          diffuseComponent = diffuseComponent.add(diffTerm);
+        }
+      }
+
+      pixelColor = ambientComponent.add(specularComponent).add(diffuseComponent);
+      let printProb = Math.random();
+      if (printProb < .01) {
+        console.log(ambientComponent, specularComponent, diffuseComponent);
+      }
+    }
+    return pixelColor;      
+  }
+  ambientTerm(object) {
+    let amTerm = this.ambientLightIntensity.multiply(object.material.ambientConstant);
+    return amTerm;
+  }
+  diffuseTerm(object, light, pointOnObject) {
+    let lightVector = (light.position.subtract(pointOnObject)).unitVec();
+    let objectNormal = object.surfaceNormal(pointOnObject).unitVec();
+    
+    let ln = lightVector.dot(objectNormal);
+    if (ln < 0) {
+      return -1;
+    } 
+
+    let diffuseTerm = light.diffuseIntensity.multiply(object.material.diffuseConstant).scale(ln);
+    return diffuseTerm;
+  }
+  specularTerm(object, light, camera, pointOnObject) {
+    let lightVector = (light.position.subtract(pointOnObject)).unitVec();
+    let objectNormal = object.surfaceNormal(pointOnObject).unitVec();
+
+    let ln = lightVector.dot(objectNormal);
+    if (ln < 0) {
+      return -1;
+    }
+
+    let reflectanceVector = ((((objectNormal).scale(2 * (ln)))).subtract(lightVector)).unitVec();
+    let viewVector = (camera.position.subtract(pointOnObject)).unitVec();
+    let vr = viewVector.dot(reflectanceVector);
+    if (vr < 0) {
+      return -1;
+    }
+    
+    let specularComponent = (light.specularIntensity.multiply(object.material.specularConstant)).scale(Math.pow(vr, object.material.shininess));
+    let printProb = Math.random();
+    if (printProb < .01) {
+      console.log("specComp:", specularComponent, reflectanceVector, viewVector, specularComponent);
+      console.log(light.specularIntensity, object.material.specularConstant, viewVector.dot(reflectanceVector), object.material.shininess, Math.pow(viewVector.dot(reflectanceVector) , object.material.shininess));
+      console.log("//");
+    }
+    return specularComponent;
+  }
+  /* Render function for arbitrary objects (spheres only currently) */
+  render() {
+    let screenH = this.canvas.height;
+    let screenW = this.canvas.width;
+
+    let alpha = 0, beta = 0;
+    let xMin = 9999, yMin = 9999;
+    let xMax = -9999, yMax = -9999;
+    if (rayCastDebug) {
+        for (let i = 0; i < screenW; i++) {
+            for (let j = 0; j < screenH; j++) {
+                alpha = (i + 1) / screenW;
+                beta = (j + 1) / screenH;
+                let p = bilinearInterpolate(alpha, beta);
+                let direction = p.subtract(camPosition);
+                if (direction.x < xMin) {
+                    xMin = direction.x;
+                }    
+                if (direction.x > xMax) {
+                    xMax = direction.x;
+                }    
+                if (direction.y < yMin) {
+                    yMin = direction.y;
+                }    
+                if (direction.y > yMax) {
+                    yMax = direction.y;
+                }    
+            }
+        }
+        console.log(xMax, xMin, yMax, yMin);
+    }
+
+    for (let i = 0; i < screenW; i++) {
+      for (let j = 0; j < screenH; j++) {
+          alpha = (i + 1) / screenW;
+          beta = (j + 1) / screenH;
+          let pixelColor = this.getColorAtPixel(i, j, alpha, beta);
+          pixelColor = pixelColor.getFullScale(255);
+
+          ctx.fillStyle = "rgb("+pixelColor.r+","+pixelColor.g+","+pixelColor.b+")";
+          ctx.fillRect(i,j, 1,1);
+        }
+      }
+    }
 }
 
 ///////////////////////////////////////////////////////////////
@@ -96,10 +287,11 @@ let imagePlane = new ImagePlane(imPVec1, imPVec2, imPVec3, imPVec4);
 
 let camPosition = new Vector(0, 0, -1);
 let camera = new Camera(camPosition);
+let scene;
 /////////////////////////////////////
 /////////////////////////////////
 
-function initCanvas() {
+function init() {
     canvas = document.getElementById('mainCanvas');
     canvas.width = screenW;
     canvas.height = screenH;
@@ -109,10 +301,13 @@ function initCanvas() {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, screenW, screenH);
 
-    raySphCollisionTest();
+    //let ambientLightIntensity = new Color(0, 0, 0);
+    let ambientLightIntensity = new Color(0.1, 0.1, 0.1);
     
+    scene = new Scene(canvas, camera, imagePlane, [], [], ambientLightIntensity);
+    raySphCollisionTest();
 }
-window.onload = initCanvas;
+window.onload = init;
 
 // Full ray casting //
 function castAllRays() {
@@ -199,8 +394,8 @@ function raySphereCollisionMagnitude(Ray, Sphere) {
     return -1;
   }
        
-  let t1 = (-b + Math.sqrt(discriminant)) / 2*a;
-  let t2 = (-b - Math.sqrt(discriminant)) / 2*a;
+  let t1 = (-b + Math.sqrt(discriminant)) / (2*a);
+  let t2 = (-b - Math.sqrt(discriminant)) / (2*a);
   
   if (t1 < 0) {
     if (t2 < 0) {
@@ -228,9 +423,28 @@ function getRandomRGB() {
   return "rgb("+r+","+g+","+b+")";
 }
 
+function createRandomMaterial() {
+  let r = Math.random();
+  let g = Math.random();
+  let b = Math.random();
+  let ambientConstant = new Color (r, g, b);
+  let diffuseConstant = new Color (r, g, b);
+  let specularConstant = new Color (r, g, b);
+  let shininess = Math.floor(Math.random()*100) + 1;
+  return new Material(ambientConstant, diffuseConstant, specularConstant, shininess);
+}
+
+function getRandomVector(minX, maxX, minY, maxY, minZ, maxZ) {
+  let randX, randY, randZ;
+  randX = getRandomIntInRange(minX, maxX);
+  randY = getRandomIntInRange(minY, maxY);
+  randZ = getRandomIntInRange(minZ, maxZ);
+  return new Vector(randX, randY, randZ);
+}
+
 function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, count, colorArray) {
   let sphereArray = [];
-  let randX, randY, randRadius, center, color;
+  let randX, randY, randZ, randRadius, center, color, material;
 
   for (let i = 0; i < count; i++) {
     randX = getRandomIntInRange(minX, maxX);
@@ -238,200 +452,67 @@ function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, 
     randZ = getRandomIntInRange(minZ, maxZ);
     center = new Vector(randX, randY, randZ);
     randRadius = getRandomIntInRange(1, radiusMaximus);
-    color = colorArray[getRandomIntInRange(0, colorArray.length)];
-    //color = getRandomRGB();
+    //color = colorArray[getRandomIntInRange(0, colorArray.length)];
+    color = new Color(Math.random(), Math.random(), Math.random());
+    material = createRandomMaterial();
 
-    let sphere = new Sphere(center, randRadius, color);
+    let sphere = new Sphere(center, randRadius, color, material);
     sphereArray.push(sphere);
   }
   return sphereArray;
 }
 
-function raySphCollisionTest() {
-  let sphereArray = createRandomSpheres(-10, 10, -10, 10, 20, 40, 5, 5, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
-  console.log(sphereArray);
-  render(sphereArray);
-}
 
-function raySphCollisionTestMinRadius() {
-  let sphereArray = [];
-
-  let c1 = new Vector(-50,1,50);
-  let c2 = new Vector(-40,1,50);
-  let c3 = new Vector(-30,1,50);
-  let c4 = new Vector(-20,1,50);
-  let c5 = new Vector(-10,1,50);
-  let c6 = new Vector(0,1,50);
-  let c7 = new Vector(10,1,50);
-  let c8 = new Vector(20,1,50);
-  let c9 = new Vector(35,1,50);
-  let c10 = new Vector(55,1,50);
-
-  let s1 = new Sphere(c1, -10, "red");
-  let s2 = new Sphere(c2, -5, "white");
-  let s3 = new Sphere(c3, -1, "green");
-  let s4 = new Sphere(c4, 0, "red");
-  let s5 = new Sphere(c5, 1, "red");
-  let s6 = new Sphere(c6, 2, "red");
-  let s7 = new Sphere(c7, 3, "red");
-  let s8 = new Sphere(c8, 4, "red");
-  let s9 = new Sphere(c9, 5, "red");
-  let s10 = new Sphere(c10, 6, "red");
-
-  sphereArray.push(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10);  
-  /*
-  //Same center, different radius, should only see the larger one  
-  let c1 = new Vector(1,1,1);
-  let c2 = new Vector(1,1,1);
-  let s1 = new Sphere(c1)
-  */
-
-  console.log(sphereArray);
-  render(sphereArray);
-}
-
-function raySphCollisionTestMinRadiusNegZ() {
-  let sphereArray = [];
-
-  let c1 = new Vector(-50,1,-50);
-  let c2 = new Vector(-40,1,-50);
-  let c3 = new Vector(-30,1,-50);
-  let c4 = new Vector(-20,1,-50);
-  let c5 = new Vector(-10,1,-50);
-  let c6 = new Vector(0,1,-50);
-  let c7 = new Vector(10,1,-50);
-  let c8 = new Vector(20,1,-50);
-  let c9 = new Vector(35,1,-50);
-  let c10 = new Vector(55,1,-50);
-
-  let s1 = new Sphere(c1, 10, "red");
-  let s2 = new Sphere(c2, 5, "white");
-  let s3 = new Sphere(c3, 1, "green");
-  let s4 = new Sphere(c4, 0, "red");
-  let s5 = new Sphere(c5, 1, "red");
-  let s6 = new Sphere(c6, 2, "red");
-  let s7 = new Sphere(c7, 3, "red");
-  let s8 = new Sphere(c8, 4, "red");
-  let s9 = new Sphere(c9, 5, "red");
-  let s10 = new Sphere(c10, 6, "red");
-
-  sphereArray.push(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10);  
-  /*
-  //Same center, different radius, should only see the larger one  
-  let c1 = new Vector(1,1,1);
-  let c2 = new Vector(1,1,1);
-  let s1 = new Sphere(c1)
-  */
-
-  console.log(sphereArray);
-  render(sphereArray);
-}
-
-function raySphCollisionTestOcclusion() {
-  let sphereArray = [];
-  let c7 = new Vector(2,-2,10);
-  let c8 = new Vector(-2,-2,20);
-  let c9 = new Vector(-2,2,30);
-  let c10 = new Vector(2,2,40);
-  let s7 = new Sphere(c7, 3, "blue");
-  let s8 = new Sphere(c8, 3, "cyan");
-  let s9 = new Sphere(c9, 3, "brown");
-  let s10 = new Sphere(c10, 3, "violet");
-
-  sphereArray.push(s7, s8, s9, s10);  
-
-  console.log(sphereArray);
-  render(sphereArray);
-}
-function raySphCollisionTestOcclusionSameCoords() {
-  let sphereArray = [];
-  let c7 = new Vector(1,1,20);
-  let c8 = new Vector(1,1,20);
-  let c9 = new Vector(1,1,20);
-  let c10 = new Vector(1,1,20);
-  let s7 = new Sphere(c7, 5, "blue");
-  let s8 = new Sphere(c8, 7, "cyan");
-  let s9 = new Sphere(c9, 8, "brown");
-  let s10 = new Sphere(c10, 9, "violet");
-
-  sphereArray.push(s7, s8, s9, s10);  
+function createRandomPointLights(xMin, xMax, yMin, yMax, zMin, zMax, count) {
+  let lightArray = [];
+  let light;
   
+  for (let i = 0; i < count; i++) {
+    let diffuseIntensity = new Color(Math.random()/2,Math.random()/2,Math.random()/2);
+    let specularIntensity = new Color(Math.random()/2,Math.random()/2,Math.random()/2);
+    let position = getRandomVector(xMin, xMax, yMin, yMax, zMin, zMax);
+    light = new pointLight(position, diffuseIntensity, specularIntensity);
+    lightArray.push(light);;
+  }
+  return lightArray;
+}
+
+function clamp (min, max, val) {
+  if (val < min) {
+    val = min;
+  }
+  if (val > max) {
+    val = max;
+  }
+  return val;
+}
+
+function raySphCollisionTest() {
+  let sphereArray = createRandomSpheres(-20, 20, -20, 20, 40, 80, 10, 10, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
-  render(sphereArray);
-}
+  scene.objects = sphereArray;
 
+  let oneLightTest = 1;
+  let multiLightCount = 1;
+  let lightArray = [];
+
+  if (oneLightTest) {
+    let lightPosition = new Vector(400, 0, -10);
+    let oneLight = new pointLight(lightPosition, new Color(0.7, 0.2, 0.2), new Color(0.8, 0.2, 0.2));
+    lightArray.push(oneLight);
+    lightPosition = new Vector(-400, 0, -10);
+    oneLight = new pointLight(lightPosition, new Color(0.2, 0.7, 0.2), new Color(0.2, 0.8, 0.2));
+    lightArray.push(oneLight);
+    lightPosition = new Vector(0, 40, -10);
+    oneLight = new pointLight(lightPosition, new Color(0.2, 0.2, 0.7), new Color(0.2, 0.2, 0.8));
+    lightArray.push(oneLight);
+  } else {
+    lightArray = createRandomPointLights(-40, 40, -40, 40, 20, 60, multiLightCount);
+  }
+  scene.lights = lightArray;
+  console.log(lightArray);
+  scene.render();
+}
 /////////////////////////////////////////
-/* Render function for arbitrary objects (spheres only currently) */
-function render(objects) {
-  let alpha = 0, beta = 0;
-  let xMin = 9999, yMin = 9999;
-  let xMax = -9999, yMax = -9999;
-  if (rayCastDebug) {
-      for (let i = 0; i < screenW; i++) {
-          for (let j = 0; j < screenH; j++) {
-              alpha = (i + 1) / screenW;
-              beta = (j + 1) / screenH;
-              let p = bilinearInterpolate(alpha, beta);
-              let direction = p.subtract(camPosition);
-              if (direction.x < xMin) {
-                  xMin = direction.x;
-              }    
-              if (direction.x > xMax) {
-                  xMax = direction.x;
-              }    
-              if (direction.y < yMin) {
-                  yMin = direction.y;
-              }    
-              if (direction.y > yMax) {
-                  yMax = direction.y;
-              }    
-          }
-      }
-      console.log(xMax, xMin, yMax, yMin);
-  }
 
-  for (let i = 0; i < screenW; i++) {
-    for (let j = 0; j < screenH; j++) {
-        alpha = (i + 1) / screenW;
-        beta = (j + 1) / screenH;
-        let p = bilinearInterpolate(alpha, beta);
-        let direction = p.subtract(camPosition);
-        //in our implementation, since p is between 0 and 1, whereas camPosition is at norm 1, we only consider negative t values later on.
-      
-        if (rayCastDebug) {
-            let xScale = Math.floor(((direction.x - xMin) / (xMax - xMin)) * 255 + 1) / 255;
-            let yScale = Math.floor(((direction.y - yMin) / (yMax - yMin)) * 255 + 1) / 255;
-            red = xScale * 255;
-            green = yScale * 255;
-            blue = 80;
-            ctx.fillStyle = "rgb("+red+","+green+","+blue+")";
-            ctx.fillRect(i, j, 1, 1);
-        }
-
-        let ray = new Ray(p, direction);
-        let minColMagn = Number.POSITIVE_INFINITY;
-        let closestObj, rayCastResult;
-        let isEdge = 0;
-        for (let obj of objects) {
-          rayCastResult = raySphereCollisionMagnitude(ray, obj);
-          if (rayCastResult > 1) {
-              if (i % 50 == 0) {
-                console.log(obj, ray, rayCastResult);
-              }
-              minColMagn = rayCastResult;
-              closestObj = obj;
-            }
-        }
-        if (Number.isFinite(minColMagn)) {
-          if (isEdge) {
-            ctx.fillStyle = "black";
-          } else {
-            ctx.fillStyle = closestObj.color;
-          }            
-          ctx.fillRect(i,j, 1,1);
-          //console.log(closestObj, ray);
-        }
-    }
-  }
-}
 ////////////////////////////////////////////////////////////////////////////

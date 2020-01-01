@@ -178,16 +178,16 @@ class Scene {
     let rayColorWithoutReflection = ambientComponent.add(specularComponent).add(diffuseComponent);
     //if recursion continues, cast another ray from pointOnObj, find out whether it intersects another obj
     //calculate reflectance vector
-    let V = incomingRay.direction.scale(-1)
-      .unitVec();
-    let N = obj.surfaceNormal(pointOnObj);
-    let R = ((N.scale((2 * (N.dot(V)))))
-      .subtract(V))
-      .unitVec();
-    
-    let newRay = new Ray(pointOnObj, R);
-    //if it does, call this function recursively on that, return color at pointOnObj + kr-adjusted recursive color    
     if (recursionDepth > 0) {
+      let V = incomingRay.direction.scale(-1)
+        .unitVec();
+      let N = obj.surfaceNormal(pointOnObj);
+      let R = ((N.scale((2 * (N.dot(V)))))
+        .subtract(V))
+        .unitVec();
+      
+      let newRay = new Ray(pointOnObj, R);
+      //if it does, call this function recursively on that, return color at pointOnObj + kr-adjusted recursive color    
       //check for intersection
       let intersection = this.getClosestIntersection(newRay);
       if (intersection != -1) {
@@ -195,6 +195,7 @@ class Scene {
         let targetObjectReflectivity = intersection.object.material.reflectivityConstant;
         reflectedComponent = this.getColorThroughRay(newRay, intersection.pointOnObject, intersection.object, recursionDepth - 1);
         reflectedComponent = reflectedComponent.scale(targetObjectReflectivity);
+        reflectedComponent = new Color(1, 1, 1);
       }
     }
     //if it does not, or if the recursion does not continue, return color at pointOnObj
@@ -505,7 +506,7 @@ function getRandomVector(minX, maxX, minY, maxY, minZ, maxZ) {
 function createRandomSpheres(minX, maxX, minY, maxY, minZ, maxZ, radiusMaximus, count, colorArray) {
   let sphereArray = [];
   let randX, randY, randZ, randRadius, center, color, material;
-  let reflectivityAdjustment = 2;
+  let reflectivityAdjustment = 1;
 
   for (let i = 0; i < count; i++) {
     randX = getRandomIntInRange(minX, maxX);
@@ -549,8 +550,8 @@ function clamp (min, max, val) {
 }
 
 function raySphCollisionTest() {
-  let objCount = 12;
-  let maxRadius = 10;
+  let objCount = 8;
+  let maxRadius = 8;
   let sphereArray = createRandomSpheres(-15, 15, -15, 15, 20, 30, maxRadius, objCount, ["white", "green", "red", "orange", "blue", "yellow", "cyan", "violet"]);
   console.log(sphereArray);
   scene.objects = sphereArray;

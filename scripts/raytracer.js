@@ -384,6 +384,7 @@ function init() {
     
     scene = new Scene(canvas, camera, imagePlane, [], [], ambientLightIntensity, recursionDepth, backgroundColor);
     raySphCollisionTest();
+    return 0;
 }
 window.onload = init;
 
@@ -598,5 +599,24 @@ function raySphCollisionTest() {
   scene.render(2);
 }
 /////////////////////////////////////////
+// Button functions
+function refreshPage() {
+  let canvas = document.getElementById('mainCanvas')
+  ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, screenW, screenH);
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, screenW, screenH);
+  setTimeout(init, 2);
+}
+let downloadCount = 1
+function saveImg(self) {
+  let canvas = document.getElementById('mainCanvas')
+  let downloadStr = downloadCount == 1 ? downloadCount.toString() + "_" + "bonbon.png" : downloadCount.toString() + "_" + "bonbons.png"
+  downloadCount++
 
+  let link = document.getElementById('likeATrackingPixelButNot');
+  link.setAttribute('download', downloadStr);
+  link.setAttribute('href', canvas.toDataURL("image/png").replace("image/png", "image/octet-stream"));
+  link.click();
+}
 ////////////////////////////////////////////////////////////////////////////

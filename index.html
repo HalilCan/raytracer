@@ -8,7 +8,24 @@
 </head>
 
 <body>
-    <div class="canvasContainer">
-        <canvas id="mainCanvas"></canvas>
+    <noscript>Enable javascript for delicious molecules!</noscript>
+    <div class="viewContainer">
+        <div class="canvasContainer">
+            <canvas id="mainCanvas"></canvas>
+        </div>
+        <div class="buttons">    
+            <button class="button" id="refreshButton" onclick="refreshPage()">
+                Refresh
+            </button>    
+            <button class="button" id="saveButton" onclick="saveImg()">
+                Save
+            </button>
+        </div>
+        <div id="loadInformer" class="hidden">
+            Rendering...
+        </div>
+    </div>
+    <div class="hidden">
+        <a id="likeATrackingPixelButNot">.</a>
     </div>
 </body>

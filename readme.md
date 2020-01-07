@@ -2,6 +2,8 @@
 ## What
 `raytracer` is an exercise in linear algebra used to render delicious-looking objects. It supports diffuse and specular lighting, shadows, antialiasing, and recursive rendering for reflections. The only catch is: you can only render spheres.
 
+![bonbon](/images/1_bonbon.png)
+
 Try it [here](https://halilcan.github.io/raytracer/)!
 
 ### Current Goals

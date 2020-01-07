@@ -2,6 +2,8 @@
 ## What
 `raytracer` is an exercise in linear algebra used to render delicious-looking objects. It supports diffuse and specular lighting, shadows, antialiasing, and recursive rendering for reflections. The only catch is: you can only render spheres.
 
+Try it [here](https://halilcan.github.io/raytracer/)!
+
 ### Current Goals
 - Dare I say... polygons?! Normals would be easy, though I am foreseeing great troubles if I don't reduce the intersection-search range. Perhaps a convex 'sleeve' for complex objects that work as a stepping stone. If the larger sleeve isn't intersected, a polygon within the sleeve definitely is not. How to make the sleeves... Spheres? Rastering onto screen?
 - Also, a good stepping stone (conceptually) to a 2d rendering engine for games. (like `hex`, hopefully)

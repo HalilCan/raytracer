@@ -21,6 +21,8 @@
 8. Distributed ray tracing and anti-aliasing
     DONE
 9.  Edge detection (t difference limit, alpha/b limit?)
-10. Multisampling antialiasing (SAA at the edges)
+10. Optimize multisampling antialiasing (SAA only at the edges)
 11. Soft shadows
-        By modeling a light source as a 2D interval and distributing shadow rays over that interval, soft shadows can be rendered.
+        By modeling a light source as a 2D interval and distributing shadow rays over that interval, soft shadows can be rendered. Essentially MSAA for light rays.
+12. Implement cross products
+13. Get polygons working: Ray-triangle intersection algorithm, full light interactions

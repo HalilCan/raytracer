@@ -33,6 +33,13 @@ class Vector {
     return (this.x * v.x + this.y * v.y + this.z * v.z);
     //equivalent to |this||v|cosTheta
   }
+  cross(v) {
+    return new Vector(
+      this.y * v.z - this.z - v.y,
+      this.x * v.z - this.z * v.x,
+      this.x * v.y - this.y * v.x
+    );
+  }
   projectionOnto(v) {
     return (this.dot(v) / v.norm());
     //this.dot(v) is |this||v|cosTheta
@@ -341,6 +348,25 @@ class Scene {
         }
       }
     }
+}
+
+class Polygon{
+  constructor(v1, v2, v3) {
+    this.v1 = v1;
+    this.v2 = v2;
+    this.v3 = v3;
+  }
+
+  getRayIntersection(ray) {
+    //returns [result[0:1], absolute intersection vector, ray direction magnitude]
+    let u1 = this.v3.subtract(this.v1);
+    let u2 = this.v2.subtract(this.v1);
+    let normal = u1.cross(u2);
+
+    let rayDirection = ray.direction;
+    let rayOrigin = ray.origin;
+    let polyToOrigin = rayOrigin.subtract(this.v1);
+  }
 }
 
 ///////////////////////////////////////////////////////////////
